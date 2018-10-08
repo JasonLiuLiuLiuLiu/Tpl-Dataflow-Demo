@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 
@@ -9,7 +10,7 @@ namespace Tpl.Dataflow
 {
     public class Pipeline
     {
-        private ITargetBlock<string> _startBlock;
+        IPropagatorBlock<string, Dictionary<int, string>> _startBlock;
         private int _maxMessagesPerTask;
 
         public Pipeline(int maxMessagesPerTask)
@@ -30,16 +31,17 @@ namespace Tpl.Dataflow
 
         public Task Builder()
         {
-            var process1Block = Process1();
+            _startBlock = Process1();
             var process2Block = Process2();
             var process3Block = Process3();
-            process1Block.LinkTo(process2Block, new DataflowLinkOptions() { PropagateCompletion = true });
+
+            _startBlock.LinkTo(process2Block, new DataflowLinkOptions() { PropagateCompletion = true });
 
             process2Block.LinkTo(process3Block, new DataflowLinkOptions() { PropagateCompletion = true });
 
             process3Block.Completion.ContinueWith(_ =>
             {
-                Console.WriteLine($"Process1 Complete,State{_.Status}");
+                Console.WriteLine($"Process3 Complete,State{_.Status}");
                 Console.WriteLine("所有任务处理完成");
             });
 
@@ -49,18 +51,21 @@ namespace Tpl.Dataflow
         private IPropagatorBlock<string, Dictionary<int, string>> Process1()
         {
             var bufferBlock = new BufferBlock<Dictionary<int, string>>();
-            _startBlock = new ActionBlock<string>(x =>
+            var actionBlock = new ActionBlock<string>(x =>
               {
                   Console.WriteLine($"Process1 Handing:{x}");
+                  Thread.Sleep(10000);
                   var dic = new Dictionary<int, string> { { 0, x } };
                   dic.Add(1, "Process1");
                   bufferBlock.Post(dic);
               });
-            _startBlock.Completion.ContinueWith(_ =>
+            actionBlock.Completion.ContinueWith(_ =>
             {
                 Console.WriteLine($"Process1 Complete,State{_.Status}");
+                bufferBlock.Complete();
             });
-            return DataflowBlock.Encapsulate(_startBlock, bufferBlock);
+            return DataflowBlock.Encapsulate(actionBlock, bufferBlock);
+
         }
 
         private IPropagatorBlock<Dictionary<int, string>, Dictionary<int, string>> Process2()
@@ -68,6 +73,7 @@ namespace Tpl.Dataflow
             var block = new TransformBlock<Dictionary<int, string>, Dictionary<int, string>>(dic =>
                   {
                       Console.WriteLine($"Process2 Handing{dic.First().Value}");
+                      Thread.Sleep(10000);
                       dic.Add(2, "Process2");
                       return dic;
                   }
@@ -86,6 +92,7 @@ namespace Tpl.Dataflow
             var actionBlock = new ActionBlock<Dictionary<int, string>>(dic =>
                {
                    Console.WriteLine($"Process3 Handing{dic.First().Value}");
+                   Thread.Sleep(10000);
                    dic.Add(3, "Process3");
                    Console.WriteLine("Dic中的内容如下：");
                    foreach (var item in dic)
