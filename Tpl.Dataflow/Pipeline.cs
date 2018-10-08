@@ -11,11 +11,11 @@ namespace Tpl.Dataflow
     public class Pipeline
     {
         IPropagatorBlock<string, Dictionary<int, string>> _startBlock;
-        private int _maxMessagesPerTask;
+        private int _maxDegreeOfParallelism;
 
-        public Pipeline(int maxMessagesPerTask)
+        public Pipeline(int maxDegreeOfParallelism)
         {
-            _maxMessagesPerTask = maxMessagesPerTask;
+            _maxDegreeOfParallelism = maxDegreeOfParallelism;
         }
 
         public void Process(string[] inputs)
@@ -53,11 +53,14 @@ namespace Tpl.Dataflow
             var bufferBlock = new BufferBlock<Dictionary<int, string>>();
             var actionBlock = new ActionBlock<string>(x =>
               {
-                  Console.WriteLine($"Process1 Handing:{x}");
-                  Thread.Sleep(10000);
+                  Console.WriteLine($"Process1 处理中:{x}");
+                  Thread.Sleep(5000);
                   var dic = new Dictionary<int, string> { { 0, x } };
                   dic.Add(1, "Process1");
                   bufferBlock.Post(dic);
+              }, new ExecutionDataflowBlockOptions
+              {
+                  MaxDegreeOfParallelism = _maxDegreeOfParallelism
               });
             actionBlock.Completion.ContinueWith(_ =>
             {
@@ -72,10 +75,13 @@ namespace Tpl.Dataflow
         {
             var block = new TransformBlock<Dictionary<int, string>, Dictionary<int, string>>(dic =>
                   {
-                      Console.WriteLine($"Process2 Handing{dic.First().Value}");
-                      Thread.Sleep(10000);
+                      Console.WriteLine($"Process2 处理中：{dic.First().Value}");
+                      Thread.Sleep(5000);
                       dic.Add(2, "Process2");
                       return dic;
+                  }, new ExecutionDataflowBlockOptions
+                  {
+                      MaxDegreeOfParallelism = _maxDegreeOfParallelism
                   }
                );
 
@@ -91,8 +97,8 @@ namespace Tpl.Dataflow
         {
             var actionBlock = new ActionBlock<Dictionary<int, string>>(dic =>
                {
-                   Console.WriteLine($"Process3 Handing{dic.First().Value}");
-                   Thread.Sleep(10000);
+                   Console.WriteLine($"Process3 处理中：{dic.First().Value}");
+                   Thread.Sleep(5000);
                    dic.Add(3, "Process3");
                    Console.WriteLine("Dic中的内容如下：");
                    foreach (var item in dic)
@@ -100,6 +106,9 @@ namespace Tpl.Dataflow
                        Console.Write($"{item.Key}:{item.Value}||");
                    }
                    Console.WriteLine();
+               }, new ExecutionDataflowBlockOptions
+               {
+                   MaxDegreeOfParallelism = _maxDegreeOfParallelism
                });
             return actionBlock;
         }

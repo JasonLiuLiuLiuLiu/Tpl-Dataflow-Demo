@@ -6,12 +6,15 @@ namespace Tpl.Dataflow
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
-
-            var pipeline = new Pipeline(1);
-            var task = pipeline.Builder();
-            pipeline.Process(new[] { "码", "农", "阿", "宇" });
-            task.Wait();
+            Console.WriteLine("请输入管道并发数:");
+            if (int.TryParse(Console.ReadLine(), out int max))
+            {
+                var pipeline = new Pipeline(max);
+                var task = pipeline.Builder();
+                pipeline.Process(new[] { "码", "农", "阿", "宇" });
+                task.Wait();
+                Console.ReadKey();
+            }
         }
     }
 }
